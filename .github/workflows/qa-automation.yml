@@ -1,0 +1,54 @@
+name: QA Automation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  qa-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_BASE_URL: ${{ vars.APP_BASE_URL || 'http://localhost:8080' }}
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'http://localhost:8080' }}
+      UI_BASE_URL: ${{ vars.UI_BASE_URL || 'http://localhost:8080' }}
+      TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      INVALID_TEST_PASSWORD: ${{ vars.INVALID_TEST_PASSWORD || 'WrongPassword123!' }}
+      SKIP_ON_UNREACHABLE: "true"
+      UI_HEADLESS: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browser
+        run: playwright install --with-deps chromium
+
+      - name: Run pytest
+        run: |
+          mkdir -p test-results
+          pytest --junitxml=test-results/pytest-report.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: |
+            test-results/pytest-report.xml
+            reports/test-run.log
